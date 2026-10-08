@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from schemas import CertificateJobRequest
 from database import SessionLocal
 from models import Job, Certificate
+from services.bulk_service import process_job
 
 app = FastAPI()
 

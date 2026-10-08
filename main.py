@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from schemas import CertificateJobRequest
 from database import SessionLocal
 from models import Job, Certificate
@@ -11,8 +11,32 @@ app = FastAPI()
 def root():
     return {"message":"Bulk Certificate Generator API"}
 
+def run_job_in_background(job_id: int, event_name: str):
+    db = SessionLocal()
+
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+
+        if not job:
+            return
+
+        job.status = "processing"
+        db.commit()
+
+        process_job(
+            db=db,
+            job=job,
+            event_name=event_name
+        )
+
+    finally:
+        db.close()
+
 @app.post("/jobs")
-def create_job(request: CertificateJobRequest):
+def create_job(
+    request: CertificateJobRequest,
+    background_tasks: BackgroundTasks
+):
     db = SessionLocal()
 
     try:
@@ -37,10 +61,10 @@ def create_job(request: CertificateJobRequest):
 
         db.commit()
 
-        process_job(
-            db=db,
-            job=job,
-            event_name=request.event_name
+        background_tasks.add_task(
+            run_job_in_background,
+            job.id,
+            request.event_name
         )
 
         return {
@@ -52,7 +76,8 @@ def create_job(request: CertificateJobRequest):
         }
 
 
-    finally:db.close()
+    finally:
+        db.close()
     
 @app.get("/jobs/{job_id}")
 def get_job(job_id: int):
@@ -62,7 +87,10 @@ def get_job(job_id: int):
         job = db.query(Job).filter(Job.id == job_id).first()
 
         if not job:
-            return {"error": "Job not found"}
+            raise HTTPException(
+                status_code=404,
+                detail="Job not found"
+            )
 
         return {
             "job_id": job.id,
@@ -87,10 +115,16 @@ def get_certificate(certificate_id: int):
         )
 
         if not certificate:
-            return {"error": "Certificate not found"}
+            raise HTTPException(
+                status_code=404,
+                detail="Certificate not found"
+            )
 
         if certificate.status != "success":
-            return {"error": "Certificate is not available"}
+            raise HTTPException(
+                status_code=409,
+                detail="Certificate is not available"
+            )
 
         return FileResponse(
             path=certificate.file_path,

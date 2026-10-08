@@ -3,6 +3,9 @@ from reportlab.lib.pagesizes import A4
 
 
 def generate_certificate(name: str, event_name: str, output_path: str):
+    if name == "FAIL":
+        raise Exception("Intentional test failure")
+    
     pdf = canvas.Canvas(output_path, pagesize=A4)
 
     width, height = A4

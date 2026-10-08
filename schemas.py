@@ -1,11 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+
 
 class Recipient(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     email: EmailStr
 
-class CertificateJobRequest(BaseModel):
-    event_name: str
-    recipients: list[Recipient]
 
-    
+class CertificateJobRequest(BaseModel):
+    event_name: str = Field(min_length=1)
+    recipients: list[Recipient] = Field(min_length=1)
